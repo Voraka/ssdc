@@ -10,4 +10,4 @@ setup(name='ssdc',
       url='https://github.com/bwall/ssdc',
       requires=['pydeep'],
       scripts=['ssdc'],
-     )
+      py_modules=['ssdc_lib'])
