@@ -1,6 +1,5 @@
 import pydeep
 from os.path import abspath, isfile, isdir, join
-import hashlib
 import base64
 from struct import unpack
 from glob import iglob
@@ -84,15 +83,8 @@ def get_version():
     return "1.2.0"
 
 
-def ssdeep_cluster(root_paths,
-                   recursive=False,
-                   dontcompute=False,
-                   calculate_sha256=False,
-                   should_print=False,
-                   score_threshold=0):
-    paths = enumerate_paths(root_paths, recursive)
+def ssdeep_cluster(ssdeep_values, score_threshold=0):
     hashes = {}
-    sha256s = {}
     integerdb = {}
 
     matches = {}
@@ -112,75 +104,48 @@ def ssdeep_cluster(root_paths,
 
         return similar_to
 
-    if dontcompute:
-        real_paths = set()
-        for path in paths:
-            with open(path, "r") as f:
-                for line in f:
-                    line = line.strip()
-                    if len(line) == 0:
-                        continue
-                    real_paths.add(line)
-        paths = list(real_paths)
+    for ssdeep_value in ssdeep_values:
+        hashes[ssdeep_value] = ssdeep_value
 
-    for path in paths:
-        if not dontcompute:
-            hashes[path] = pydeep.hash_file(path)
-            if calculate_sha256:
-                sha256s[path] = hashlib.sha256(file(path, 'rb').read()).hexdigest()
-        else:
-            if "," in path:
-                shash, path = path.split(",", 1)
-                path = path.strip('"')
-            else:
-                shash = path
-            hashes[path] = shash
-            if calculate_sha256:
-                sha256s[path] = \
-                    hashlib.sha256(file(path, 'rb').read()).hexdigest() if isfile(path)\
-                        else hashlib.sha256(path).hexdigest()
-        block_size, chunk, double_chunk = preprocess_hash(hashes[path])
+        block_size, chunk, double_chunk = preprocess_hash(hashes[ssdeep_value])
 
-        similar_to = add_to_integer_db(block_size, chunk, path) | add_to_integer_db(block_size * 2, double_chunk, path)
+        similar_to = add_to_integer_db(block_size, chunk, ssdeep_value) | add_to_integer_db(block_size * 2, double_chunk, ssdeep_value)
 
-        h = hashes[path]
-        matches[path] = set()
+        h = hashes[ssdeep_value]
+        matches[ssdeep_value] = set()
         for other in similar_to:
             score = pydeep.compare(h, hashes[other])
             if score > score_threshold:
-                matches[path].add(other)
-                matches[other].add(path)
-                if path not in scores:
-                    scores[path] = {}
-                if other not in scores[path]:
-                    scores[path][other] = score
+                matches[ssdeep_value].add(other)
+                matches[other].add(ssdeep_value)
+                if ssdeep_value not in scores:
+                    scores[ssdeep_value] = {}
+                if other not in scores[ssdeep_value]:
+                    scores[ssdeep_value][other] = score
 
                 if other not in scores:
                     scores[other] = {}
-                if path not in scores[other]:
-                    scores[other][path] = score
-
-        if should_print:
-            print "{0}\tSHA256: {1}\tssdeep: {2}".format(path, sha256s.get(path), hashes[path])
+                if ssdeep_value not in scores[other]:
+                    scores[other][ssdeep_value] = score
 
     groups = []
-    for path in matches.keys():
+    for ssdeep_value in matches.keys():
         in_a_group = False
         for g in xrange(len(groups)):
-            if path in groups[g]:
+            if ssdeep_value in groups[g]:
                 in_a_group = True
                 continue
             should_add = True
             for h in groups[g]:
-                if h not in matches[path]:
+                if h not in matches[ssdeep_value]:
                     should_add = False
             if should_add:
-                groups[g].append(path)
+                groups[g].append(ssdeep_value)
                 in_a_group = True
         if not in_a_group:
-            groups.append([path])
+            groups.append([ssdeep_value])
 
     for g in xrange(len(groups)):
         groups[g].sort()
 
-    return groups, hashes, scores, sha256s
+    return groups
