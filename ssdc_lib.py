@@ -84,7 +84,12 @@ def get_version():
     return "1.2.0"
 
 
-def ssdeep_cluster(root_paths, recursive=False, dontcompute=False, calculate_sha256=False, should_print=False):
+def ssdeep_cluster(root_paths,
+                   recursive=False,
+                   dontcompute=False,
+                   calculate_sha256=False,
+                   should_print=False,
+                   score_threshold=0):
     paths = enumerate_paths(root_paths, recursive)
     hashes = {}
     sha256s = {}
@@ -142,7 +147,7 @@ def ssdeep_cluster(root_paths, recursive=False, dontcompute=False, calculate_sha
         matches[path] = set()
         for other in similar_to:
             score = pydeep.compare(h, hashes[other])
-            if score > 0:
+            if score > score_threshold:
                 matches[path].add(other)
                 matches[other].add(path)
                 if path not in scores:
